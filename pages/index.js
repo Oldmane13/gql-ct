@@ -1,8 +1,121 @@
-import Head from 'next/head'
-import Image from 'next/image'
-import styles from '../styles/Home.module.css'
+import Head from "next/head";
+import Image from "next/image";
+import styles from "../styles/Home.module.css";
+import { getApiRoot, projectKey } from "./api";
+import React, { useState, useEffect } from "react";
 
-export default function Home() {
+export default function Home({ products }) {
+  const [projectDetails, setProjectDetails] = useState({});
+  const [key, setKey] = useState();
+  const [data, setData] = useState({
+    name: "",
+  });
+  const [productData, setProductData] = useState({
+    productName: "",
+    productDescription: "",
+    productSku: "",
+    isOnStock: [{}],
+    availableQuantity: [{}],
+    colourFamily: [{}],
+    exactColour: [{}],
+  });
+
+  const {
+    productName,
+    productDescription,
+    productSku,
+    isOnStock,
+    availableQuantity,
+    colourFamily,
+    exactColour,
+  } = productData;
+
+  const { name } = data;
+
+  const handleChange = (e) => {
+    setData({ ...data, [e.target.name]: e.target.value });
+  };
+
+  const handleSearch = () => {
+    setKey(name);
+    getProject();
+  };
+
+  const productsQuery =
+    `
+    query {
+      product(key: "` +
+    key +
+    `") {
+        key
+        masterData{
+          hasStagedChanges
+          staged {
+            name(locale: "en")
+            description(locale: "en")
+            masterVariant {
+              key
+              sku
+              availability {
+                channels {
+                  results {
+                    availability {
+                      isOnStock
+                      availableQuantity
+                      restockableInDays
+                    }
+                  }
+                }
+              }
+              attributesRaw(includeNames: ["exactColour", "onSale", "colourFamily"]) {
+                value
+              }
+            }
+          }
+        }
+      }
+    }
+`;
+
+  const getProject = async () => {
+    try {
+      const project = await getApiRoot()
+        .withProjectKey({ projectKey })
+        .graphql()
+        .post({
+          body: { query: productsQuery },
+        })
+        .execute()
+        .then((data) => {
+          console.log("Project information --->", data);
+          setProjectDetails(data.body.data);
+          setProductData({
+            productName: data.body.data.product.masterData.staged.name,
+            productDescription:
+              data.body.data.product.masterData.staged.description,
+            productSku:
+              data.body.data.product.masterData.staged.masterVariant.sku,
+            isOnStock:
+              data.body.data.product.masterData.staged.masterVariant
+                .availability.channels.results,
+            colourFamily:
+              data.body.data.product.masterData.staged.masterVariant
+                .attributesRaw,
+            exactColour:
+              data.body.data.product.masterData.staged.masterVariant
+                .attributesRaw,
+          });
+        })
+        .catch(console.error);
+    } catch (e) {
+      console.log(e);
+    }
+  };
+
+  useEffect(() => {
+    getProject();
+  }, []);
+
   return (
     <div className={styles.container}>
       <Head>
@@ -13,43 +126,47 @@ export default function Home() {
 
       <main className={styles.main}>
         <h1 className={styles.title}>
-          Welcome to <a href="https://nextjs.org">Next.js!</a>
+          Welcome to Alex&apos;s scuffed graphql demo
         </h1>
 
-        <p className={styles.description}>
-          Get started by editing{' '}
-          <code className={styles.code}>pages/index.js</code>
-        </p>
+        <p className={styles.description}>Search for a product in CT:</p>
+
+        <div>
+          <input
+            type="text"
+            name="name"
+            placeholder="yer product code"
+            value={name}
+            onChange={handleChange}
+            required
+          ></input>
+        </div>
+
+        <button className={styles.description} onClick={handleSearch}>
+          <span>Search</span>
+        </button>
 
         <div className={styles.grid}>
-          <a href="https://nextjs.org/docs" className={styles.card}>
-            <h2>Documentation &rarr;</h2>
-            <p>Find in-depth information about Next.js features and API.</p>
-          </a>
-
-          <a href="https://nextjs.org/learn" className={styles.card}>
-            <h2>Learn &rarr;</h2>
-            <p>Learn about Next.js in an interactive course with quizzes!</p>
-          </a>
-
-          <a
-            href="https://github.com/vercel/next.js/tree/canary/examples"
-            className={styles.card}
-          >
-            <h2>Examples &rarr;</h2>
-            <p>Discover and deploy boilerplate example Next.js projects.</p>
-          </a>
-
-          <a
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template&utm_campaign=create-next-app"
-            className={styles.card}
-          >
-            <h2>Deploy &rarr;</h2>
-            <p>
-              Instantly deploy your Next.js site to a public URL with Vercel.
-            </p>
-          </a>
+          {/* {JSON.stringify(projectDetails, undefined, 2)} <br /> */}
+          Product name: {productData.productName}, <br /> Product description:{" "}
+          {productData.productDescription}, <br />
+          Product Sku: {productData.productSku}
+          , <br />
+          Availability: {JSON.stringify(productData.isOnStock)}, <br /> Colour
+          Family: {JSON.stringify(productData.colourFamily)},
         </div>
+        <span style={{ marginTop: "48px" }}>
+          <iframe
+            src="https://giphy.com/embed/sI9zGC4bh9eCI"
+            width="480"
+            height="267"
+            frameBorder="0"
+            allowFullScreen
+          ></iframe>
+          <p>
+            <a href="https://giphy.com/gifs/troll-fabulous-flamingo-sI9zGC4bh9eCI"></a>
+          </p>
+        </span>
       </main>
 
       <footer className={styles.footer}>
@@ -58,12 +175,9 @@ export default function Home() {
           target="_blank"
           rel="noopener noreferrer"
         >
-          Powered by{' '}
-          <span className={styles.logo}>
-            <Image src="/vercel.svg" alt="Vercel Logo" width={72} height={16} />
-          </span>
+          Powered by 🦩{" "}
         </a>
       </footer>
     </div>
-  )
+  );
 }
