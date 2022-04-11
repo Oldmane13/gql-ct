@@ -1,23 +1,23 @@
 import Head from "next/head";
 import Image from "next/image";
 import styles from "../styles/Home.module.css";
-import { getApiRoot, projectKey } from "./api";
+import { getApiRoot, projectKey, GET_PRODUCTS, useGetProducts } from "./api";
 import React, { useState, useEffect } from "react";
+import { GraphQLClient, gql } from "graphql-request";
 
-export default function Home({ products }) {
-  const [projectDetails, setProjectDetails] = useState({});
+const Home = () => {
   const [key, setKey] = useState();
-  const [data, setData] = useState({
+  const [dataForm, setDataForm] = useState({
     name: "",
   });
   const [productData, setProductData] = useState({
     productName: "",
     productDescription: "",
     productSku: "",
-    isOnStock: [{}],
-    availableQuantity: [{}],
-    colourFamily: [{}],
-    exactColour: [{}],
+    isOnStock: "",
+    availableQuantity: "",
+    colourFamily: "",
+    exactColour: "",
   });
 
   const {
@@ -30,91 +30,31 @@ export default function Home({ products }) {
     exactColour,
   } = productData;
 
-  const { name } = data;
+  const { name } = dataForm;
 
   const handleChange = (e) => {
-    setData({ ...data, [e.target.name]: e.target.value });
+    setDataForm({ ...dataForm, [e.target.name]: e.target.value });
+    setKey(name);
   };
 
   const handleSearch = () => {
-    setKey(name);
-    getProject();
+    setProductData({
+      productName: data.product.masterData.staged.name,
+      productDescription: data.product.masterData.staged.description,
+      productSku: data.product.masterData.staged.masterVariant.sku,
+      isOnStock:
+        data.product.masterData.staged.masterVariant.availability.channels
+          .results[0].availability.isOnStock,
+      colourFamily:
+        data.product.masterData.staged.masterVariant.attributesRaw[0].value.en,
+      exactColour: data.product.masterData.staged.masterVariant.attributesRaw,
+    });
+    console.log(data);
   };
 
-  const productsQuery =
-    `
-    query {
-      product(key: "` +
-    key +
-    `") {
-        key
-        masterData{
-          hasStagedChanges
-          staged {
-            name(locale: "en")
-            description(locale: "en")
-            masterVariant {
-              key
-              sku
-              availability {
-                channels {
-                  results {
-                    availability {
-                      isOnStock
-                      availableQuantity
-                      restockableInDays
-                    }
-                  }
-                }
-              }
-              attributesRaw(includeNames: ["exactColour", "onSale", "colourFamily"]) {
-                value
-              }
-            }
-          }
-        }
-      }
-    }
-`;
-
-  const getProject = async () => {
-    try {
-      const project = await getApiRoot()
-        .withProjectKey({ projectKey })
-        .graphql()
-        .post({
-          body: { query: productsQuery },
-        })
-        .execute()
-        .then((data) => {
-          console.log("Project information --->", data);
-          setProjectDetails(data.body.data);
-          setProductData({
-            productName: data.body.data.product.masterData.staged.name,
-            productDescription:
-              data.body.data.product.masterData.staged.description,
-            productSku:
-              data.body.data.product.masterData.staged.masterVariant.sku,
-            isOnStock:
-              data.body.data.product.masterData.staged.masterVariant
-                .availability.channels.results,
-            colourFamily:
-              data.body.data.product.masterData.staged.masterVariant
-                .attributesRaw,
-            exactColour:
-              data.body.data.product.masterData.staged.masterVariant
-                .attributesRaw,
-          });
-        })
-        .catch(console.error);
-    } catch (e) {
-      console.log(e);
-    }
-  };
-
-  useEffect(() => {
-    getProject();
-  }, []);
+  const { data, isLoading, error } = useGetProducts(["product"], GET_PRODUCTS);
+  if (isLoading) return <div>Loading ...</div>;
+  if (error) return <div>Something went wrong ...</div>;
 
   return (
     <div className={styles.container}>
@@ -147,7 +87,6 @@ export default function Home({ products }) {
         </button>
 
         <div className={styles.grid}>
-          {/* {JSON.stringify(projectDetails, undefined, 2)} <br /> */}
           Product name: {productData.productName}, <br /> Product description:{" "}
           {productData.productDescription}, <br />
           Product Sku: {productData.productSku}
@@ -180,4 +119,6 @@ export default function Home({ products }) {
       </footer>
     </div>
   );
-}
+};
+
+export default Home;
